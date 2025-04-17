@@ -411,6 +411,7 @@ func (m *XHRProxy) sendTcp(request *ICefRequest) (*XHRProxyResponse, error) {
 			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.IP, m.Port), m.TcpClient.Timeout)
 			if err == nil {
 				m.TcpClient.Client = conn
+				fmt.Println("tcp client connect success")
 				break // 连接成功，返回连接对象
 			}
 			fmt.Println(fmt.Sprintf("[Error] XHRProxy TCP Dial: %s, trying reconnect", err))
@@ -420,7 +421,7 @@ func (m *XHRProxy) sendTcp(request *ICefRequest) (*XHRProxyResponse, error) {
 			return nil, errors.New("tcp client is nil")
 		}
 	}
-
+	fmt.Println("tcp client start send message")
 	httpResponse, err := m.sendHttpRequestOverTcp(httpRequest)
 	if err != nil {
 		return nil, err
@@ -555,7 +556,9 @@ func requestToHTTP(request *http.Request) ([]byte, error) {
 
 	// 如果有请求体，则写入请求体
 	if request.Body != nil {
+		fmt.Println("read request body")
 		body, err := io.ReadAll(request.Body)
+		fmt.Println("read request body done")
 		if err != nil {
 			return nil, err
 		}
