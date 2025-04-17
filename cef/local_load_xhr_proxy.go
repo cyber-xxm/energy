@@ -488,7 +488,9 @@ func (m *XHRProxy) sendHttpRequestOverTcp(request *http.Request) (*http.Response
 	// 组合完整报文
 	// fullPacket := append(header, iv...)
 	// fullPacket = append(fullPacket, encryptedData...)
+	fmt.Println("tcp client start write data")
 	wl, err := writer.Write(requestData)
+	fmt.Println(fmt.Sprintf("tcp client start write data done: %d", wl))
 	if err != nil {
 		println("[Error] XHRProxy TCP Write: ", err.Error())
 		return nil, err
@@ -497,6 +499,7 @@ func (m *XHRProxy) sendHttpRequestOverTcp(request *http.Request) (*http.Response
 		println("[Error] XHRProxy TCP Write Data Zero: ", err.Error())
 		return nil, errors.New("写入数据失败，长度为0")
 	}
+	fmt.Println("tcp client start read response")
 	// 使用bufio.Reader包装conn，以便逐行读取数据
 	reader := bufio.NewReader(m.TcpClient.Client)
 
@@ -533,6 +536,7 @@ func (m *XHRProxy) sendHttpRequestOverTcp(request *http.Request) (*http.Response
 
 	// 将收集到的数据转换为http.Response
 	resp, err := http.ReadResponse(reader, request)
+	fmt.Println("tcp client read response done")
 	if err != nil {
 		fmt.Println("Error parsing response:", err.Error())
 		return nil, err
