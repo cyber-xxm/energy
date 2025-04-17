@@ -209,7 +209,7 @@ func (m *XHRProxy) init() {
 		}
 		if m.TcpClient.Client == nil {
 			if m.TcpClient.Timeout <= 0 {
-				m.TcpClient.Timeout = time.Second * 30
+				m.TcpClient.Timeout = time.Second * 10
 			}
 		}
 	}
@@ -405,13 +405,15 @@ func (m *XHRProxy) sendTcp(request *ICefRequest) (*XHRProxyResponse, error) {
 		header.Free()
 	}
 	if m.TcpClient.Client == nil {
+		fmt.Println("tcp client is nil, reconnecting...")
 		for i := 0; i < 10; i++ {
+			fmt.Println(fmt.Sprintf("tcp client is nil, reconnecting count %d...", i+1))
 			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.IP, m.Port), m.TcpClient.Timeout)
 			if err == nil {
 				m.TcpClient.Client = conn
 				break // 连接成功，返回连接对象
 			}
-			fmt.Println(fmt.Sprintf("[Error] XHRProxy TCP Dial: %s, trying reconnect", err.Error()))
+			fmt.Println(fmt.Sprintf("[Error] XHRProxy TCP Dial: %s, trying reconnect", err))
 			time.Sleep(15 * time.Second) // 等待一段时间后重试
 		}
 		if m.TcpClient.Client == nil {
