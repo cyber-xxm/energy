@@ -211,15 +211,6 @@ func (m *XHRProxy) init() {
 			if m.TcpClient.Timeout <= 0 {
 				m.TcpClient.Timeout = time.Second * 30
 			}
-			// TODO tls/tlcp
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.IP, m.Port), m.TcpClient.Timeout)
-			if err != nil {
-				println("[Error] XHRProxy TCP Dial: ", err.Error())
-				return
-			}
-			m.TcpClient.Client = conn
-			// 设置发送超时时间为1分钟
-			_ = conn.SetWriteDeadline(time.Now().Add(1 * time.Minute))
 		}
 	}
 }
@@ -473,6 +464,20 @@ func (m *XHRProxy) sendHttpRequestOverTcp(request *http.Request) (*http.Response
 	// if m.TcpClient.Client == nil {
 	// 	return nil, errors.New("tcp client is nil")
 	// }
+	if m.TcpClient.Client == nil {
+		for i := 0; i < 10; i++ {
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.IP, m.Port), m.TcpClient.Timeout)
+			if err == nil {
+				m.TcpClient.Client = conn
+				break // 连接成功，返回连接对象
+			}
+			fmt.Println(fmt.Sprintf("[Error] XHRProxy TCP Dial: %s, trying reconnect", err.Error()))
+			time.Sleep(15 * time.Second) // 等待一段时间后重试
+		}
+		if m.TcpClient.Client == nil {
+			return nil, errors.New("tcp client is nil")
+		}
+	}
 	writer := bufio.NewWriter(m.TcpClient.Client)
 	// 构建报文头
 	// header := make([]byte, 8)
