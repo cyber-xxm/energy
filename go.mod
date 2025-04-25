@@ -1,9 +1,8 @@
-module github.com/cyber-xxm/energy
+module github.com/cyber-xxm/energy/v2
 
 go 1.20
 
 require (
-	github.com/cyber-xxm/energy/v2 v2.6.0
 	github.com/energye/golcl v1.1.2
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20250301202403-da16c1255728
