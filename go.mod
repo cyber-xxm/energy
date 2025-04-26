@@ -13,3 +13,8 @@ require (
 	golang.org/x/image v0.26.0
 	golang.org/x/sys v0.32.0
 )
+
+retract (
+	v2.5.4
+	[v2.5.4, v2.6.0]
+)
