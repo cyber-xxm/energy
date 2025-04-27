@@ -1,3 +1,7 @@
+原仓库地址：https://github.com/energye/energy
+本仓库地址只是拿原仓库地址代码做了个人定制化修改，请前往原仓库地址clone代码
+
+
 <p align="center">
     <img src="https://energye.github.io/imgs/energy.png">
 </p>
