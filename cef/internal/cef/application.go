@@ -26,10 +26,10 @@ func SetApplication(app ICEFApplication) {
 	}
 }
 
-n
-//
 //	返回 IAp
+//
 // Application
+//
 //	返回 IApplication
 func Application() ICEFApplication {
 	return application

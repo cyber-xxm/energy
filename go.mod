@@ -2,6 +2,8 @@ module github.com/cyber-xxm/energy/v2
 
 go 1.20
 
+replace golang.org/x/sys => golang.org/x/sys v0.13.0
+
 require (
 	github.com/energye/golcl v1.1.2
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
@@ -15,6 +17,6 @@ require (
 )
 
 retract (
-	v2.5.4
 	[v2.5.4, v2.6.0]
+	v2.5.4
 )

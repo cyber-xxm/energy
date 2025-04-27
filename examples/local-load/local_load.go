@@ -34,9 +34,16 @@ func main() {
 		ResRootDir: "resources/dist", // 资源存放目录, FS不为空时是内置资源目录名, 空时当前文件执行目录, @/to/path @开头表示当前目录下开始
 		FS:         resources,        //静态资源所在的 embed.FS
 		Proxy: &cef.XHRProxy{ // 页面Ajax XHR请求接口代理转发配置
-			Scheme: consts.LpsTcp, // http's 支持ssl配置
-			IP:     "127.0.0.1",   //http服务ip或domain
+			Scheme: consts.LpsHttps, // http's 支持ssl配置
+			IP:     "127.0.0.1",     //http服务ip或domain
 			Port:   8040,
+			SSL: cef.XHRProxySSL{
+				FS:      resources,
+				RootDir: "resources/certs",
+				Cert:    "client.crt",
+				Key:     "client.key",
+				CARoots: []string{"ca.crt"},
+			},
 		},
 	}.Build())
 	cef.BrowserWindow.SetBrowserInit(func(event *cef.BrowserEvent, window cef.IBrowserWindow) {

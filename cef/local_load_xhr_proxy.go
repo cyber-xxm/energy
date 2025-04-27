@@ -18,11 +18,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -147,7 +147,7 @@ func (m *XHRProxy) init() {
 							data, err = m.SSL.FS.ReadFile(path)
 						} else {
 							path = filepath.Join(m.SSL.RootDir, path)
-							data, err = ioutil.ReadFile(path)
+							data, err = os.ReadFile(path)
 						}
 						return
 					}
@@ -178,6 +178,7 @@ func (m *XHRProxy) init() {
 						TLSClientConfig: &tls.Config{
 							Certificates: []tls.Certificate{cert},
 							RootCAs:      pool,
+							MinVersion:   tls.VersionTLS12,
 						},
 					}
 				}
@@ -259,7 +260,7 @@ func (m *XHRProxy) send(scheme string, request *ICefRequest) (*XHRProxyResponse,
 				}
 			case PDE_TYPE_FILE:
 				if f := element.GetFile(); f != "" {
-					if byt, err := ioutil.ReadFile(f); err == nil {
+					if byt, err := os.ReadFile(f); err == nil {
 						requestData.Write(byt)
 					}
 				}
@@ -375,7 +376,7 @@ func (m *XHRProxy) sendTcp(request *ICefRequest) (*XHRProxyResponse, error) {
 				}
 			case PDE_TYPE_FILE:
 				if f := element.GetFile(); f != "" {
-					if byt, err := ioutil.ReadFile(f); err == nil {
+					if byt, err := os.ReadFile(f); err == nil {
 						requestData.Write(byt)
 					}
 				}
