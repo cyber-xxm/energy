@@ -85,6 +85,7 @@ type TcpClient struct {
 	rw              net.Conn
 	Dialer          *tls.Dialer
 	Timeout         time.Duration
+	KeepAlive       time.Duration
 	TLSClientConfig *tls.Config
 }
 
@@ -176,10 +177,14 @@ func (m *XHRProxy) init() {
 			if m.TcpClient.Timeout <= 0 {
 				m.TcpClient.Timeout = time.Second * 10
 			}
+			if m.TcpClient.KeepAlive <= 0 {
+				m.TcpClient.KeepAlive = time.Second * 30
+			}
 			// 声明一个 Dialer 实例，并设置一些可选参数
 			m.TcpClient.Dialer = &tls.Dialer{
 				NetDialer: &net.Dialer{
-					Timeout: m.TcpClient.Timeout, // 设置拨号超时时间
+					Timeout:   m.TcpClient.Timeout,   // 设置拨号超时时间
+					KeepAlive: m.TcpClient.KeepAlive, // 设置保持连接的时间
 				},
 			}
 		}
