@@ -82,8 +82,10 @@ type HttpClient struct {
 //
 //	tcp 客户端
 type TcpClient struct {
-	Client  net.Conn
-	Timeout time.Duration
+	rw              net.Conn
+	Dialer          *tls.Dialer
+	Timeout         time.Duration
+	TLSClientConfig *tls.Config
 }
 
 // XHRProxyResponse
@@ -137,49 +139,9 @@ func (m *XHRProxy) init() {
 				}
 			} else {
 				if m.HttpClient.Transport == nil {
-					var (
-						certPEMBlock, keyPEMBlock []byte
-						err                       error
-					)
-					var readFile = func(path string) (data []byte, err error) {
-						if m.SSL.FS != nil {
-							path = strings.Replace(filepath.Join(m.SSL.RootDir, path), "\\", "/", -1)
-							data, err = m.SSL.FS.ReadFile(path)
-						} else {
-							path = filepath.Join(m.SSL.RootDir, path)
-							data, err = os.ReadFile(path)
-						}
-						return
-					}
-					certPEMBlock, err = readFile(m.SSL.Cert)
-					if err != nil {
-						panic(err)
-						return
-					}
-					keyPEMBlock, err = readFile(m.SSL.Key)
-					if err != nil {
-						panic(err)
-						return
-					}
-					cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
-					if err != nil {
-						panic(err)
-						return
-					}
-					pool := x509.NewCertPool()
-					for _, path := range m.SSL.CARoots {
-						if ca, err := readFile(path); err == nil {
-							pool.AppendCertsFromPEM(ca)
-						} else {
-							panic(err)
-						}
-					}
+					tlsCfg := loadCert(m)
 					m.HttpClient.Transport = &http.Transport{
-						TLSClientConfig: &tls.Config{
-							Certificates: []tls.Certificate{cert},
-							RootCAs:      pool,
-							MinVersion:   tls.VersionTLS12,
-						},
+						TLSClientConfig: tlsCfg,
 					}
 				}
 			}
@@ -203,17 +165,31 @@ func (m *XHRProxy) init() {
 		if m.HttpClient.Client.Transport == nil && m.HttpClient.Transport != nil {
 			m.HttpClient.Client.Transport = m.HttpClient.Transport
 		}
-	} else if m.Scheme == LpsTcp {
+	} else if m.Scheme == LpsTcp || m.Scheme == LpsTls || m.Scheme == LpsTlcp {
 		if m.IP == "" {
 			m.IP = "localhost"
 		}
 		if m.TcpClient == nil {
 			m.TcpClient = new(TcpClient)
 		}
-		if m.TcpClient.Client == nil {
+		if m.TcpClient.Dialer == nil {
 			if m.TcpClient.Timeout <= 0 {
 				m.TcpClient.Timeout = time.Second * 10
 			}
+			// 声明一个 Dialer 实例，并设置一些可选参数
+			m.TcpClient.Dialer = &tls.Dialer{
+				NetDialer: &net.Dialer{
+					Timeout: m.TcpClient.Timeout, // 设置拨号超时时间
+				},
+			}
+		}
+		if m.Scheme == LpsTls || m.Scheme == LpsTlcp {
+			if m.SSL.skipVerify() {
+				m.TcpClient.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+			} else {
+				m.TcpClient.TLSClientConfig = loadCert(m)
+			}
+			m.TcpClient.Dialer.Config = m.TcpClient.TLSClientConfig
 		}
 	}
 }
@@ -407,22 +383,24 @@ func (m *XHRProxy) sendTcp(request *ICefRequest) (*XHRProxyResponse, error) {
 		}
 		header.Free()
 	}
-	if m.TcpClient.Client == nil {
+	if m.TcpClient.Dialer != nil && m.TcpClient.rw == nil {
 		fmt.Println("tcp client is nil, reconnecting...")
 		for i := 0; i < 10; i++ {
 			fmt.Println(fmt.Sprintf("tcp client is nil, reconnecting count %d...", i+1))
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", m.IP, m.Port), m.TcpClient.Timeout)
+			conn, err := m.TcpClient.Dialer.Dial("tcp", fmt.Sprintf("%s:%d", m.IP, m.Port))
 			if err == nil {
-				m.TcpClient.Client = conn
+				m.TcpClient.rw = conn
 				fmt.Println("tcp client connect success")
 				break // 连接成功，返回连接对象
 			}
 			fmt.Println(fmt.Sprintf("[Error] XHRProxy TCP Dial: %s, trying reconnect", err))
-			time.Sleep(15 * time.Second) // 等待一段时间后重试
+			// time.Sleep(10 * time.Second) // 等待一段时间后重试
 		}
-		if m.TcpClient.Client == nil {
+		if m.TcpClient.rw == nil {
 			return nil, errors.New("tcp client is nil")
 		}
+	} else if m.TcpClient.Dialer == nil {
+		panic("tcp dialer config no configured")
 	}
 	fmt.Println("tcp client start send message")
 	httpResponse, err := m.sendHttpRequestOverTcp(httpRequest)
@@ -482,7 +460,7 @@ func (m *XHRProxy) sendHttpRequestOverTcp(request *http.Request) (*http.Response
 	// 	return nil, errors.New("tcp client is nil")
 	// }
 
-	writer := bufio.NewWriter(m.TcpClient.Client)
+	writer := bufio.NewWriter(m.TcpClient.rw)
 	// 构建报文头
 	// header := make([]byte, 8)
 	// binary.LittleEndian.PutUint32(header[0:4], MagicNumber)
@@ -505,7 +483,7 @@ func (m *XHRProxy) sendHttpRequestOverTcp(request *http.Request) (*http.Response
 	writer.Flush()
 	fmt.Println("tcp client start read response")
 	// 使用bufio.Reader包装conn，以便逐行读取数据
-	reader := bufio.NewReader(m.TcpClient.Client)
+	reader := bufio.NewReader(m.TcpClient.rw)
 
 	// 读取报文头（8字节）
 	// header = make([]byte, 8)
@@ -608,4 +586,49 @@ func requestToHTTP(req *http.Request) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func loadCert(m *XHRProxy) *tls.Config {
+	var (
+		certPEMBlock, keyPEMBlock []byte
+		err                       error
+	)
+	var readFile = func(path string) (data []byte, err error) {
+		if m.SSL.FS != nil {
+			path = strings.Replace(filepath.Join(m.SSL.RootDir, path), "\\", "/", -1)
+			data, err = m.SSL.FS.ReadFile(path)
+		} else {
+			path = filepath.Join(m.SSL.RootDir, path)
+			data, err = os.ReadFile(path)
+		}
+		return
+	}
+	certPEMBlock, err = readFile(m.SSL.Cert)
+	if err != nil {
+		panic(err)
+		return nil
+	}
+	keyPEMBlock, err = readFile(m.SSL.Key)
+	if err != nil {
+		panic(err)
+		return nil
+	}
+	cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+	if err != nil {
+		panic(err)
+		return nil
+	}
+	pool := x509.NewCertPool()
+	for _, path := range m.SSL.CARoots {
+		if ca, err := readFile(path); err == nil {
+			pool.AppendCertsFromPEM(ca)
+		} else {
+			panic(err)
+		}
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      pool,
+		MinVersion:   tls.VersionTLS12,
+	}
 }
